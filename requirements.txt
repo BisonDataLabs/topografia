@@ -1,0 +1,13 @@
+streamlit==1.62.0
+altair==6.2.2
+pandas==2.3.2
+numpy==2.2.5
+pydeck==0.9.1
+matplotlib==3.10.6
+Pillow==12.3.0
+requests==2.34.2
+geopandas==1.1.1
+shapely==2.1.1
+pyogrio==0.11.1
+pyproj==3.7.2
+rasterio==1.4.3
