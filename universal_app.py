@@ -12,6 +12,7 @@ from shapely import from_wkb, union_all
 
 from topografia.gis_viewer import PALETTE_GRADIENTS, raster_payload, vector_payload, viewer_html
 from topografia.package_io import TopographyPackage, load_package
+from topografia.package_summary import package_summary_rows
 from topografia.public_analysis import (
     BOUNDARY_EXTENSIONS,
     analyze_dem,
@@ -127,10 +128,6 @@ def format_number(value: object, decimals: int = 1) -> str:
     return f"{number(value):,.{decimals}f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def read_json(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
-
-
 def layer_group(layer_id: str) -> str:
     if layer_id in {"public-dem", "public-dem-aligned", "consensus-elevation", "campaign-disagreement"}:
         return "comparison"
@@ -151,7 +148,7 @@ def layer_group(layer_id: str) -> str:
 
 
 def package_layer_allowed(layer: dict) -> bool:
-    layer_id = str(layer.get("id", ""))
+    layer_id = str(layer.get("original_id") or str(layer.get("id", "")).rsplit("--", 1)[-1])
     return layer_id in PACKAGE_LAYER_IDS or layer_id.startswith("campaign-")
 
 
@@ -203,30 +200,23 @@ def package_mode(uploaded_files) -> None:
     entries, summary_rows = [], []
     for package_index, (uploaded, package) in enumerate(packages):
         field = package.catalog.get("field", {})
-        field_id = str(field.get("id") or f"lote-{package_index + 1}")
-        field_name = str(field.get("name") or field_id)
-        terrain = read_json(package.root / "metrics" / "terrain.json")
-        stability = read_json(package.root / "metrics" / "campaign_stability.json")
-        quality = read_json(package.root / "metrics" / "quality_control.json")
-        summary_rows.append(
-            {
-                "Lote": field_name,
-                "Superficie (ha)": number(terrain.get("area_ha")),
-                "Relieve robusto (m)": number(terrain.get("robust_relief_m")),
-                "Pendiente mediana (%)": number(terrain.get("slope_median_percent")),
-                "Observaciones aceptadas (%)": number(quality.get("accepted_percent")),
-                "Desacuerdo P90 (m)": number(stability.get("p90_disagreement_m")),
-            }
-        )
+        package_field_id = str(field.get("id") or f"lote-{package_index + 1}")
+        package_field_name = str(field.get("name") or package_field_id)
+        members = {
+            str(member.get("id")): str(member.get("name") or member.get("id")) for member in field.get("members", [])
+        }
+        summary_rows.extend(package_summary_rows(package))
         for layer in package.catalog.get("layers", []):
             if not package_layer_allowed(layer):
                 continue
             item = dict(layer)
-            original_id = str(item["id"])
+            original_id = str(item.get("original_id") or str(item["id"]).rsplit("--", 1)[-1])
+            field_id = str(item.get("field_id") or package_field_id)
+            field_name = str(item.get("field_name") or members.get(field_id) or package_field_name)
             item.update(
                 {
                     "original_id": original_id,
-                    "id": f"p{package_index}-{original_id}",
+                    "id": f"p{package_index}-{item['id']}",
                     "title": TITLE_OVERRIDES.get(original_id, str(item.get("title", original_id))),
                     "field_id": field_id,
                     "field_name": field_name,

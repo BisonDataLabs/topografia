@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 
-MAX_FILES = 500
+MAX_FILES = 2_000
 MAX_UNCOMPRESSED_BYTES = 1_500_000_000
 
 
